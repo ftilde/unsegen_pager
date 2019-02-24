@@ -7,4 +7,4 @@ authors = ["ftilde <ftilde@protonmail.com>"]
 syntect = "2.0"
 
 [dependencies.unsegen]
-path = ".."
+path = "../unsegen"
