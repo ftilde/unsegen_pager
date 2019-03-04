@@ -63,8 +63,8 @@ impl<L: PagerLine> LineDecorator for LineNumberDecorator<L> {
         let max_space = lines
             .last()
             .map(|(i, _)| text_width(format!(" {} ", i).as_str()))
-            .unwrap_or(0);
-        Demand::from_to(0, max_space)
+            .unwrap_or(Width::new(0).unwrap());
+        Demand::from_to(0, max_space.into())
     }
     fn decorate(&self, _: &L, line_to_decorate_index: LineIndex, _: LineIndex, mut window: Window) {
         let width = (window.get_width() - 2).positive_or_zero();

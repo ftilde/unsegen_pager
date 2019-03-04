@@ -1,4 +1,4 @@
-use unsegen::base::{BoolModifyMode, Color, LineIndex, StyleModifier, TextFormatModifier};
+use unsegen::base::{Color, LineIndex, StyleModifier, TextFormatModifier};
 
 use super::PagerLine;
 use syntect::highlighting;
@@ -16,7 +16,7 @@ impl HighlightInfo {
     pub fn none() -> Self {
         HighlightInfo {
             style_changes: Vec::new(),
-            default_style: StyleModifier::none(),
+            default_style: StyleModifier::new(),
             no_change: Vec::new(),
         }
     }
@@ -88,12 +88,10 @@ fn to_unsegen_color(color: &highlighting::Color) -> Color {
     }
 }
 fn to_unsegen_text_format(style: &highlighting::FontStyle) -> TextFormatModifier {
-    TextFormatModifier {
-        bold: style.contains(highlighting::FontStyle::BOLD).into(),
-        italic: style.contains(highlighting::FontStyle::ITALIC).into(),
-        invert: BoolModifyMode::LeaveUnchanged,
-        underline: style.contains(highlighting::FontStyle::UNDERLINE).into(),
-    }
+    TextFormatModifier::new()
+        .bold(style.contains(highlighting::FontStyle::BOLD))
+        .italic(style.contains(highlighting::FontStyle::ITALIC))
+        .underline(style.contains(highlighting::FontStyle::UNDERLINE))
 }
 fn to_unsegen_style_modifier(style: &highlighting::Style) -> StyleModifier {
     StyleModifier::new()

@@ -11,13 +11,13 @@ pub use syntect::highlighting::{Theme, ThemeSet};
 pub use syntect::parsing::{SyntaxDefinition, SyntaxSet};
 
 use unsegen::base::{
-    basic_types::*, ranges::*, BoolModifyMode, Cursor, GraphemeCluster, StyleModifier, Window,
-    WrappingMode,
+    basic_types::*, BoolModifyMode, Cursor, GraphemeCluster, StyleModifier, Window, WrappingMode,
 };
 use unsegen::input::{OperationResult, Scrollable};
 use unsegen::widget::{layout_linearly, Demand, Demand2D, RenderingHints, Widget};
 
 use std::cmp::{max, min};
+use std::ops::{Bound, RangeBounds};
 
 pub trait PagerLine {
     fn get_content(&self) -> &str;
@@ -94,7 +94,7 @@ where
     L: PagerLine,
     D: LineDecorator<Line = L>,
 {
-    pub fn view<'a, I: Into<LineIndex>, R: RangeArgument<I>>(
+    pub fn view<'a, I: Into<LineIndex> + Clone, R: RangeBounds<I>>(
         &'a self,
         range: R,
     ) -> Box<DoubleEndedIterator<Item = (LineIndex, &'a L)> + 'a>
@@ -102,17 +102,17 @@ where
         Self: ::std::marker::Sized,
     {
         // Not exactly sure, why this is needed... we only store a reference?!
-        let start: LineIndex = match range.start() {
+        let start: LineIndex = match range.start_bound() {
             // Always inclusive
-            Bound::Unbound => LineIndex::new(0),
-            Bound::Inclusive(i) => i.into(),
-            Bound::Exclusive(i) => i.into() + 1,
+            Bound::Unbounded => LineIndex::new(0),
+            Bound::Included(i) => i.clone().into(),
+            Bound::Excluded(i) => i.clone().into() + 1,
         };
-        let end: LineIndex = match range.end() {
+        let end: LineIndex = match range.end_bound() {
             // Always exclusive
-            Bound::Unbound => LineIndex::new(self.storage.len()),
-            Bound::Inclusive(i) => i.into() + 1,
-            Bound::Exclusive(i) => i.into(),
+            Bound::Unbounded => LineIndex::new(self.storage.len()),
+            Bound::Included(i) => i.clone().into() + 1,
+            Bound::Excluded(i) => i.clone().into(),
         };
         let ustart = start.raw_value();
         let uend = self.storage.len().min(end.raw_value());
@@ -289,7 +289,7 @@ where
                 best_current_line_pos_for_bottom - num_line_wraps_until_current_line,
             );
 
-            cursor.set_position(ColIndex::new(0), required_start_pos);
+            cursor.move_to(ColIndex::new(0), required_start_pos);
 
             for (line_index, line) in content.view(min_line..max_line) {
                 let line_content = line.get_content();
@@ -298,7 +298,7 @@ where
                         .invert(BoolModifyMode::Toggle)
                         .bold(true)
                 } else {
-                    StyleModifier::none()
+                    StyleModifier::new()
                 };
 
                 let (_, start_y) = cursor.get_position();
@@ -306,7 +306,7 @@ where
                 for &(change_pos, style) in content.highlight_info.get_info_for_line(line_index) {
                     cursor.write(&line_content[last_change_pos..change_pos]);
 
-                    cursor.set_style_modifier(style.on_top_of(&base_style));
+                    cursor.set_style_modifier(style.on_top_of(base_style));
                     last_change_pos = change_pos;
                 }
                 cursor.write(&line_content[last_change_pos..]);
