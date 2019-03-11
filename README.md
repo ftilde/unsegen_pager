@@ -1,6 +1,6 @@
 # unsegen_pager
 
-`unsegen_terminal` provides a pager widget for [unsegen](https://crates.io/crates/unsegen) using files or in memory buffers as backing storage.
+`unsegen_terminal` provides a pager widget for [unsegen](https://crates.io/crates/unsegen) including support for syntax highlighting and line decoration.
 
 ## Getting Started
 
