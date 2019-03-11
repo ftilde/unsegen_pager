@@ -1,3 +1,63 @@
+//! An `unsegen` widget for viewing files with additional features.
+//!
+//! # Examples:
+//! ```no_run
+//! extern crate unsegen;
+//!
+//! use std::io::{stdin, stdout};
+//! use unsegen::base::Terminal;
+//! use unsegen::input::{Input, Key, ScrollBehavior};
+//! use unsegen::widget::{RenderingHints, Widget};
+//!
+//! use unsegen_pager::{Pager, PagerContent, SyntaxSet, SyntectHighlighter, ThemeSet};
+//!
+//! fn main() {
+//!     let stdout = stdout();
+//!     let stdin = stdin();
+//!     let stdin = stdin.lock();
+//!
+//!     let file = "path/to/some/file";
+//!
+//!     let syntax_set = SyntaxSet::load_defaults_nonewlines();
+//!     let syntax = syntax_set
+//!         .find_syntax_for_file(&file)
+//!         .unwrap()
+//!         .unwrap_or(syntax_set.find_syntax_plain_text());
+//!
+//!     let theme_set = ThemeSet::load_defaults();
+//!     let theme = &theme_set.themes["base16-ocean.dark"];
+//!
+//!     let mut pager = Pager::new();
+//!     pager.load(
+//!         PagerContent::from_file(&file)
+//!             .unwrap()
+//!             .with_highlighter(SyntectHighlighter::new(syntax, theme)),
+//!     );
+//!
+//!     let mut term = Terminal::new(stdout.lock());
+//!
+//!     for input in Input::read_all(stdin) {
+//!         let input = input.unwrap();
+//!         input.chain(
+//!             ScrollBehavior::new(&mut pager)
+//!                 .forwards_on(Key::Down)
+//!                 .forwards_on(Key::Char('j'))
+//!                 .backwards_on(Key::Up)
+//!                 .backwards_on(Key::Char('k'))
+//!                 .to_beginning_on(Key::Home)
+//!                 .to_end_on(Key::End),
+//!         );
+//!         // Put more application logic here...
+//!
+//!         {
+//!             let win = term.create_root_window();
+//!             pager.draw(win, RenderingHints::default());
+//!         }
+//!         term.present();
+//!     }
+//! }
+//! ```
+
 extern crate syntect;
 extern crate unsegen;
 
@@ -19,132 +79,17 @@ use unsegen::widget::{layout_linearly, Demand, Demand2D, RenderingHints, Widget}
 use std::cmp::{max, min};
 use std::ops::{Bound, RangeBounds};
 
-pub trait PagerLine {
-    fn get_content(&self) -> &str;
-}
-
-impl PagerLine for String {
-    fn get_content(&self) -> &str {
-        self.as_str()
-    }
-}
-
-// PagerContent ---------------------------------------------------------------
-pub struct PagerContent<L: PagerLine, D: LineDecorator> {
-    storage: Vec<L>,
-    highlight_info: HighlightInfo,
-    pub decorator: D,
-}
-
-impl<L: PagerLine> PagerContent<L, NoDecorator<L>> {
-    pub fn from_lines(storage: Vec<L>) -> Self {
-        PagerContent {
-            storage: storage,
-            highlight_info: HighlightInfo::none(),
-            decorator: NoDecorator::default(),
-        }
-    }
-}
-
-impl PagerContent<String, NoDecorator<String>> {
-    pub fn from_file<F: AsRef<::std::path::Path>>(file_path: F) -> ::std::io::Result<Self> {
-        use std::io::Read;
-        let mut file = ::std::fs::File::open(file_path)?;
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)?;
-
-        Ok(PagerContent {
-            storage: contents.lines().map(|s| s.to_owned()).collect::<Vec<_>>(),
-            highlight_info: HighlightInfo::none(),
-            decorator: NoDecorator::default(),
-        })
-    }
-}
-
-impl<L, D> PagerContent<L, D>
-where
-    L: PagerLine,
-    D: LineDecorator<Line = L>,
-{
-    pub fn with_highlighter<HN: Highlighter>(self, highlighter: HN) -> PagerContent<L, D> {
-        let highlight_info = highlighter.highlight(self.storage.iter().map(|l| l as &PagerLine));
-        PagerContent {
-            storage: self.storage,
-            highlight_info: highlight_info,
-            decorator: self.decorator,
-        }
-    }
-}
-
-impl<L> PagerContent<L, NoDecorator<L>>
-where
-    L: PagerLine,
-{
-    pub fn with_decorator<DN: LineDecorator<Line = L>>(self, decorator: DN) -> PagerContent<L, DN> {
-        PagerContent {
-            storage: self.storage,
-            highlight_info: self.highlight_info,
-            decorator: decorator,
-        }
-    }
-}
-
-impl<L, D> PagerContent<L, D>
-where
-    L: PagerLine,
-    D: LineDecorator<Line = L>,
-{
-    pub fn view<'a, I: Into<LineIndex> + Clone, R: RangeBounds<I>>(
-        &'a self,
-        range: R,
-    ) -> Box<DoubleEndedIterator<Item = (LineIndex, &'a L)> + 'a>
-    where
-        Self: ::std::marker::Sized,
-    {
-        // Not exactly sure, why this is needed... we only store a reference?!
-        let start: LineIndex = match range.start_bound() {
-            // Always inclusive
-            Bound::Unbounded => LineIndex::new(0),
-            Bound::Included(i) => i.clone().into(),
-            Bound::Excluded(i) => i.clone().into() + 1,
-        };
-        let end: LineIndex = match range.end_bound() {
-            // Always exclusive
-            Bound::Unbounded => LineIndex::new(self.storage.len()),
-            Bound::Included(i) => i.clone().into() + 1,
-            Bound::Excluded(i) => i.clone().into(),
-        };
-        let ustart = start.raw_value();
-        let uend = self.storage.len().min(end.raw_value());
-        let urange = ustart..uend;
-        Box::new(
-            urange
-                .clone()
-                .into_iter()
-                .zip(self.storage[urange].iter())
-                .map(|(i, l)| (LineIndex::new(i), l)),
-        )
-    }
-
-    pub fn view_line<I: Into<LineIndex>>(&self, line: I) -> Option<&L> {
-        self.storage.get(line.into().raw_value())
-    }
-}
-
-#[derive(Debug)]
-pub enum PagerError {
-    NoLineWithIndex(LineIndex),
-    NoLineWithPredicate,
-    NoContent,
-}
-
-// Pager -----------------------------------------------------------------------
-
+/// Main `Widget`, may (or may not) store content, but defines static types for content and
+/// decoration.
+///
+/// Use `load` to actually fill the widget with content.
 pub struct Pager<L, D = NoDecorator<L>>
 where
     L: PagerLine,
     D: LineDecorator,
 {
+    // TODO: might be dangerous to allow direct access... maybe use deref or something? Experiment
+    // with ugdb.
     pub content: Option<PagerContent<L, D>>,
     current_line: LineIndex,
 }
@@ -154,6 +99,7 @@ where
     L: PagerLine,
     D: LineDecorator<Line = L>,
 {
+    /// Create an empty pager, with no current content.
     pub fn new() -> Self {
         Pager {
             content: None,
@@ -370,3 +316,125 @@ where
         }
     }
 }
+
+/// Anything that represents a single line in a pager. Other than the main content (something
+/// string-like) it may also store additional information that can be used by a `Highlighter`.
+pub trait PagerLine {
+    fn get_content(&self) -> &str;
+}
+
+impl PagerLine for String {
+    fn get_content(&self) -> &str {
+        self.as_str()
+    }
+}
+
+pub struct PagerContent<L: PagerLine, D: LineDecorator> {
+    storage: Vec<L>,
+    highlight_info: HighlightInfo,
+    pub decorator: D,
+}
+
+impl<L: PagerLine> PagerContent<L, NoDecorator<L>> {
+    pub fn from_lines(storage: Vec<L>) -> Self {
+        PagerContent {
+            storage: storage,
+            highlight_info: HighlightInfo::none(),
+            decorator: NoDecorator::default(),
+        }
+    }
+}
+
+impl PagerContent<String, NoDecorator<String>> {
+    pub fn from_file<F: AsRef<::std::path::Path>>(file_path: F) -> ::std::io::Result<Self> {
+        use std::io::Read;
+        let mut file = ::std::fs::File::open(file_path)?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)?;
+
+        Ok(PagerContent {
+            storage: contents.lines().map(|s| s.to_owned()).collect::<Vec<_>>(),
+            highlight_info: HighlightInfo::none(),
+            decorator: NoDecorator::default(),
+        })
+    }
+}
+
+impl<L, D> PagerContent<L, D>
+where
+    L: PagerLine,
+    D: LineDecorator<Line = L>,
+{
+    pub fn with_highlighter<HN: Highlighter>(self, highlighter: HN) -> PagerContent<L, D> {
+        let highlight_info = highlighter.highlight(self.storage.iter().map(|l| l as &PagerLine));
+        PagerContent {
+            storage: self.storage,
+            highlight_info: highlight_info,
+            decorator: self.decorator,
+        }
+    }
+}
+
+impl<L> PagerContent<L, NoDecorator<L>>
+where
+    L: PagerLine,
+{
+    pub fn with_decorator<DN: LineDecorator<Line = L>>(self, decorator: DN) -> PagerContent<L, DN> {
+        PagerContent {
+            storage: self.storage,
+            highlight_info: self.highlight_info,
+            decorator: decorator,
+        }
+    }
+}
+
+impl<L, D> PagerContent<L, D>
+where
+    L: PagerLine,
+    D: LineDecorator<Line = L>,
+{
+    pub fn view<'a, I: Into<LineIndex> + Clone, R: RangeBounds<I>>(
+        &'a self,
+        range: R,
+    ) -> Box<DoubleEndedIterator<Item = (LineIndex, &'a L)> + 'a>
+    where
+        Self: ::std::marker::Sized,
+    {
+        // Not exactly sure, why this is needed... we only store a reference?!
+        let start: LineIndex = match range.start_bound() {
+            // Always inclusive
+            Bound::Unbounded => LineIndex::new(0),
+            Bound::Included(i) => i.clone().into(),
+            Bound::Excluded(i) => i.clone().into() + 1,
+        };
+        let end: LineIndex = match range.end_bound() {
+            // Always exclusive
+            Bound::Unbounded => LineIndex::new(self.storage.len()),
+            Bound::Included(i) => i.clone().into() + 1,
+            Bound::Excluded(i) => i.clone().into(),
+        };
+        let ustart = start.raw_value();
+        let uend = self.storage.len().min(end.raw_value());
+        let urange = ustart..uend;
+        Box::new(
+            urange
+                .clone()
+                .into_iter()
+                .zip(self.storage[urange].iter())
+                .map(|(i, l)| (LineIndex::new(i), l)),
+        )
+    }
+
+    pub fn view_line<I: Into<LineIndex>>(&self, line: I) -> Option<&L> {
+        self.storage.get(line.into().raw_value())
+    }
+}
+
+#[derive(Debug)]
+pub enum PagerError {
+    NoLineWithIndex(LineIndex),
+    NoLineWithPredicate,
+    NoContent,
+}
+
+// Pager -----------------------------------------------------------------------
