@@ -94,6 +94,19 @@ where
     current_line: LineIndex,
 }
 
+impl<L, D> Default for Pager<L, D>
+where
+    L: PagerLine,
+    D: LineDecorator<Line = L>,
+{
+    fn default() -> Self {
+        Pager {
+            content: None,
+            current_line: LineIndex::new(0),
+        }
+    }
+}
+
 impl<L, D> Pager<L, D>
 where
     L: PagerLine,
@@ -143,7 +156,7 @@ where
         let line = if let Some(ref mut content) = self.content {
             content
                 .view(LineIndex::new(0)..)
-                .find(|&(index, ref line)| predicate(index.into(), line))
+                .find(|&(index, ref line)| predicate(index, line))
                 .map(|(index, _)| index)
                 .ok_or(PagerError::NoLineWithPredicate)
         } else {
@@ -186,7 +199,7 @@ where
             let min_line = self
                 .current_line
                 .checked_sub(num_adjacent_lines_to_load)
-                .unwrap_or(LineIndex::new(0));
+                .unwrap_or_else(|| LineIndex::new(0));
             let max_line = self.current_line + num_adjacent_lines_to_load;
 
             // Split window
@@ -338,7 +351,7 @@ pub struct PagerContent<L: PagerLine, D: LineDecorator> {
 impl<L: PagerLine> PagerContent<L, NoDecorator<L>> {
     pub fn from_lines(storage: Vec<L>) -> Self {
         PagerContent {
-            storage: storage,
+            storage,
             highlight_info: HighlightInfo::none(),
             decorator: NoDecorator::default(),
         }
@@ -369,7 +382,7 @@ where
         let highlight_info = highlighter.highlight(self.storage.iter().map(|l| l as &PagerLine));
         PagerContent {
             storage: self.storage,
-            highlight_info: highlight_info,
+            highlight_info,
             decorator: self.decorator,
         }
     }
@@ -383,7 +396,7 @@ where
         PagerContent {
             storage: self.storage,
             highlight_info: self.highlight_info,
-            decorator: decorator,
+            decorator,
         }
     }
 }
@@ -419,7 +432,6 @@ where
         Box::new(
             urange
                 .clone()
-                .into_iter()
                 .zip(self.storage[urange].iter())
                 .map(|(i, l)| (LineIndex::new(i), l)),
         )
@@ -436,5 +448,3 @@ pub enum PagerError {
     NoLineWithPredicate,
     NoContent,
 }
-
-// Pager -----------------------------------------------------------------------
