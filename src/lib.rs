@@ -88,9 +88,7 @@ where
     L: PagerLine,
     D: LineDecorator,
 {
-    // TODO: might be dangerous to allow direct access... maybe use deref or something? Experiment
-    // with ugdb.
-    pub content: Option<PagerContent<L, D>>,
+    content: Option<PagerContent<L, D>>,
     current_line: LineIndex,
 }
 
@@ -128,6 +126,14 @@ where
         if !self.line_exists(current_line) {
             let _ = self.scroll_to_end();
         }
+    }
+
+    pub fn content(&self) -> Option<&PagerContent<L, D>> {
+        self.content.as_ref()
+    }
+
+    pub fn content_mut(&mut self) -> Option<&mut PagerContent<L, D>> {
+        self.content.as_mut()
     }
 
     fn line_exists<I: Into<LineIndex>>(&mut self, line: I) -> bool {
@@ -345,7 +351,7 @@ impl PagerLine for String {
 pub struct PagerContent<L: PagerLine, D: LineDecorator> {
     storage: Vec<L>,
     highlight_info: HighlightInfo,
-    pub decorator: D,
+    decorator: D,
 }
 
 impl<L: PagerLine> PagerContent<L, NoDecorator<L>> {
@@ -439,6 +445,10 @@ where
 
     pub fn view_line<I: Into<LineIndex>>(&self, line: I) -> Option<&L> {
         self.storage.get(line.into().raw_value())
+    }
+
+    pub fn set_decorator(&mut self, decorator: D) {
+        self.decorator = decorator;
     }
 }
 
