@@ -388,8 +388,8 @@ pub struct PagerContent<L: PagerLine, D: LineDecorator> {
 }
 
 impl<L: PagerLine> PagerContent<L, NoDecorator<L>> {
-    /// Create a simple `PagerContent` from a ordered collection of lines. The lines the Vec will be
-    /// displayed top to bottom from beginning to end.
+    /// Create a simple `PagerContent` from a ordered collection of lines. The lines the `Vec` will
+    /// be displayed top to bottom from beginning to end.
     pub fn from_lines(storage: Vec<L>) -> Self {
         PagerContent {
             storage,

@@ -16,7 +16,7 @@ pub trait LineDecorator {
 
     /// Define how much (horizontal) space is required to draw the decoration of the given lines.
     ///
-    /// As the width of the decorator column is fixed for all lines, the implementor should choose
+    /// As the width of the decorator column is fixed for all lines, the implementer should choose
     /// the maximum demand of all lines.
     fn horizontal_space_demand<'a, 'b: 'a>(
         &'a self,
@@ -31,7 +31,7 @@ pub trait LineDecorator {
     /// and/or the index of the currently active line of the pager.
     ///
     /// Note that window is at least one row in height and in fact is so in most cases, but an
-    /// implementor cannot rely on that. It is also not guaranteed that the window is as wide as
+    /// implementer cannot rely on that. It is also not guaranteed that the window is as wide as
     /// specified in the last call to `horizontal_space_demand`.
     fn decorate(
         &self,

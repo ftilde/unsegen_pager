@@ -2,7 +2,7 @@
 ///
 /// `Highlighter` defines the main trait any highlighting engine must implement.
 /// `SyntectHighlighter` is the only included highlighter and should be sufficient for most
-/// usecases.
+/// use cases.
 use unsegen::base::{Color, LineIndex, StyleModifier, TextFormatModifier};
 
 use super::PagerLine;
@@ -14,7 +14,7 @@ use syntect::highlighting::Theme;
 /// Interface for anything that highlights the content of Pagers.
 ///
 /// `SyntectHighlighter` is an exemplary implementation that can should be sufficient for most
-/// usecases.
+/// use cases.
 pub trait Highlighter {
     /// Compute highlighting information for the given range of lines.
     fn highlight<'a, L: Iterator<Item = &'a PagerLine>>(&self, lines: L) -> HighlightInfo;
@@ -22,8 +22,8 @@ pub trait Highlighter {
 
 /// Result of a highlighting operation (i.e., a call to Highlighter::highlight).
 pub struct HighlightInfo {
-    /// A map of changes per line.  The outer vec corresponds to lines. The entries of the inner
-    /// vec specify that at the specified column index, the given modifier should be applied.
+    /// A map of changes per line.  The outer `Vec` corresponds to lines. The entries of the inner
+    /// `Vec` specify that at the specified column index, the given modifier should be applied.
     pub style_changes: Vec<Vec<(usize, StyleModifier)>>,
     /// Style that will be applied if no other style has been specified.
     pub default_style: StyleModifier,
