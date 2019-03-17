@@ -27,11 +27,12 @@
 //!     let theme_set = ThemeSet::load_defaults();
 //!     let theme = &theme_set.themes["base16-ocean.dark"];
 //!
+//!     let highlighter = SyntectHighlighter::new(syntax, theme);
 //!     let mut pager = Pager::new();
 //!     pager.load(
 //!         PagerContent::from_file(&file)
 //!             .unwrap()
-//!             .with_highlighter(SyntectHighlighter::new(syntax, theme)),
+//!             .with_highlighter(&highlighter),
 //!     );
 //!
 //!     let mut term = Terminal::new(stdout.lock());
@@ -421,7 +422,7 @@ where
     D: LineDecorator<Line = L>,
 {
     /// Add a `Highlighter` to `PagerContent` that previously did not have one.
-    pub fn with_highlighter<HN: Highlighter>(self, highlighter: HN) -> PagerContent<L, D> {
+    pub fn with_highlighter<HN: Highlighter>(self, highlighter: &HN) -> PagerContent<L, D> {
         let highlight_info = highlighter.highlight(self.storage.iter().map(|l| l as &PagerLine));
         PagerContent {
             storage: self.storage,
