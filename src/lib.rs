@@ -83,6 +83,10 @@ use std::ops::{Bound, RangeBounds};
 /// decoration.
 ///
 /// Use `load` to actually fill the widget with content.
+///
+/// In addition to the `PagerContent`, it has a concept of an 'active line' that can be updated via
+/// user interaction (using the `Scrollable` implementation) and is always displayed when drawn to
+/// a window.
 pub struct Pager<L, D = NoDecorator<L>>
 where
     L: PagerLine,
@@ -118,6 +122,9 @@ where
         }
     }
 
+    /// Load (and potentially overwrite previous) content to display in the pager.
+    ///
+    /// If possible, the current line position will be preserved.
     pub fn load(&mut self, content: PagerContent<L, D>) {
         self.content = Some(content);
 
@@ -128,10 +135,22 @@ where
         }
     }
 
+    /// Clear the current content.
+    ///
+    /// On subsequent `draw` calls, nothing will be written to the window.
+    pub fn clear_content(&mut self) {
+        self.content = None;
+    }
+
+    /// Get a reference to the current content, if available.
     pub fn content(&self) -> Option<&PagerContent<L, D>> {
         self.content.as_ref()
     }
 
+    /// Get a mutable reference to the current content, if available.
+    ///
+    /// Note that `PagerContent` does not allow mutable access to the stored lines, so it is
+    /// required to use `load` to update the contents. A pager is not a text editor.
     pub fn content_mut(&mut self) -> Option<&mut PagerContent<L, D>> {
         self.content.as_mut()
     }
@@ -145,6 +164,9 @@ where
         }
     }
 
+    /// Go to the specified line, if present.
+    ///
+    /// If there is no such line, an error is returned.
     pub fn go_to_line<I: Into<LineIndex>>(&mut self, line: I) -> Result<(), PagerError> {
         let line: LineIndex = line.into();
         if self.line_exists(line) {
@@ -155,6 +177,9 @@ where
         }
     }
 
+    /// Go to first line that matches the given predicate.
+    ///
+    /// If there is no such line, an error is returned.
     pub fn go_to_line_if<F: Fn(LineIndex, &L) -> bool>(
         &mut self,
         predicate: F,
@@ -171,10 +196,12 @@ where
         line.and_then(|index| self.go_to_line(index))
     }
 
+    /// Get the index of the currently active line.
     pub fn current_line_index(&self) -> LineIndex {
         self.current_line
     }
 
+    /// Get a reference to the currently active line.
     pub fn current_line(&self) -> Option<&L> {
         if let Some(ref content) = self.content {
             content.storage.get(self.current_line_index().raw_value())
@@ -293,6 +320,7 @@ where
         }
     }
 }
+
 impl<L, D> Scrollable for Pager<L, D>
 where
     L: PagerLine,
@@ -348,6 +376,11 @@ impl PagerLine for String {
     }
 }
 
+/// A collection of `PagerLines` including information about the highlighting state and (if
+/// present) a `LineDecorator`.
+///
+/// Use `from_lines` or `from_file` to build an initial content and add highlighter and decorator
+/// using `with_highlighter` and `with_decorator`.
 pub struct PagerContent<L: PagerLine, D: LineDecorator> {
     storage: Vec<L>,
     highlight_info: HighlightInfo,
@@ -355,6 +388,8 @@ pub struct PagerContent<L: PagerLine, D: LineDecorator> {
 }
 
 impl<L: PagerLine> PagerContent<L, NoDecorator<L>> {
+    /// Create a simple `PagerContent` from a ordered collection of lines. The lines the Vec will be
+    /// displayed top to bottom from beginning to end.
     pub fn from_lines(storage: Vec<L>) -> Self {
         PagerContent {
             storage,
@@ -365,6 +400,7 @@ impl<L: PagerLine> PagerContent<L, NoDecorator<L>> {
 }
 
 impl PagerContent<String, NoDecorator<String>> {
+    /// Try to load lines (as strings) from the given file as the lines of PagerContent.
     pub fn from_file<F: AsRef<::std::path::Path>>(file_path: F) -> ::std::io::Result<Self> {
         use std::io::Read;
         let mut file = ::std::fs::File::open(file_path)?;
@@ -384,6 +420,7 @@ where
     L: PagerLine,
     D: LineDecorator<Line = L>,
 {
+    /// Add a `Highlighter` to `PagerContent` that previously did not have one.
     pub fn with_highlighter<HN: Highlighter>(self, highlighter: HN) -> PagerContent<L, D> {
         let highlight_info = highlighter.highlight(self.storage.iter().map(|l| l as &PagerLine));
         PagerContent {
@@ -398,6 +435,7 @@ impl<L> PagerContent<L, NoDecorator<L>>
 where
     L: PagerLine,
 {
+    /// Add a `Decorator` to `PagerContent` that previously did not have one.
     pub fn with_decorator<DN: LineDecorator<Line = L>>(self, decorator: DN) -> PagerContent<L, DN> {
         PagerContent {
             storage: self.storage,
@@ -412,10 +450,14 @@ where
     L: PagerLine,
     D: LineDecorator<Line = L>,
 {
+    /// Iterate over a specified range of lines stored.
+    ///
+    /// The specified range can be larger than what the `PagerContent` currently holds. In that
+    /// case the additional indices are simply not part of the returned iterator.
     pub fn view<'a, I: Into<LineIndex> + Clone, R: RangeBounds<I>>(
         &'a self,
         range: R,
-    ) -> Box<DoubleEndedIterator<Item = (LineIndex, &'a L)> + 'a>
+    ) -> impl DoubleEndedIterator<Item = (LineIndex, &'a L)> + 'a
     where
         Self: ::std::marker::Sized,
     {
@@ -435,23 +477,24 @@ where
         let ustart = start.raw_value();
         let uend = self.storage.len().min(end.raw_value());
         let urange = ustart..uend;
-        Box::new(
-            urange
-                .clone()
-                .zip(self.storage[urange].iter())
-                .map(|(i, l)| (LineIndex::new(i), l)),
-        )
+        urange
+            .clone()
+            .zip(self.storage[urange].iter())
+            .map(|(i, l)| (LineIndex::new(i), l))
     }
 
+    /// Try to view a specific line with the given index.
     pub fn view_line<I: Into<LineIndex>>(&self, line: I) -> Option<&L> {
         self.storage.get(line.into().raw_value())
     }
 
+    /// Overwrite the current decorator with a compatible one.
     pub fn set_decorator(&mut self, decorator: D) {
         self.decorator = decorator;
     }
 }
 
+/// All errors that can occur when operating on a `Pager` or its contents.
 #[derive(Debug)]
 pub enum PagerError {
     NoLineWithIndex(LineIndex),
