@@ -1,6 +1,6 @@
 # unsegen_pager
 
-`unsegen_pager` provides a pager widget for [unsegen](https://crates.io/crates/unsegen) including support for syntax highlighting and line decoration.
+`unsegen_pager` provides a pager widget for [unsegen](https://crates.io/crates/unsegen) including support for syntax highlighting (using [syntect](https://github.com/trishume/syntect)) and line decoration.
 
 ## Getting Started
 
@@ -9,6 +9,10 @@
 ```toml
 unsegen_pager = "0.0.1"
 ```
+
+## Screenshots
+
+![](screenshot.png)
 
 ## Examples
 
