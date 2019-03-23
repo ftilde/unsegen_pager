@@ -1,6 +1,6 @@
 [package]
 name = "unsegen_pager"
-version = "0.0.1"
+version = "0.1.1"
 authors = ["ftilde <ftilde@protonmail.com>"]
 
 description = "An unsegen widget for viewing files with additional features"
