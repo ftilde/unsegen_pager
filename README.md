@@ -1,5 +1,9 @@
 # unsegen_pager
 
+[![](https://img.shields.io/crates/v/unsegen_pager.svg)](https://crates.io/crates/unsegen_pager/)
+[![](https://docs.rs/unsegen_pager/badge.svg)](https://docs.rs/unsegen_pager/)
+[![](https://img.shields.io/crates/l/unsegen_pager.svg)]()
+
 `unsegen_pager` provides a pager widget for [unsegen](https://crates.io/crates/unsegen) including support for syntax highlighting (using [syntect](https://github.com/trishume/syntect)) and line decoration.
 
 ## Getting Started
