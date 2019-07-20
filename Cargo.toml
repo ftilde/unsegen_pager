@@ -12,4 +12,4 @@ keywords = ["terminal", "tui", "pager"]
 
 [dependencies]
 syntect = "2.0"
-unsegen = "0.1"
+unsegen = "0.2"
