@@ -11,7 +11,7 @@
 `unsegen_pager` is [available on crates.io](https://crates.io/crates/unsegen_pager). You can install it by adding this line to your `Cargo.toml`:
 
 ```toml
-unsegen_pager = "0.1.2"
+unsegen_pager = "0.2.0"
 ```
 
 ## Screenshots
