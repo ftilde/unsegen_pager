@@ -210,9 +210,21 @@ where
             None
         }
     }
+
+    pub fn as_widget<'a>(&'a self) -> impl Widget + 'a {
+        PagerWidget { inner: self }
+    }
 }
 
-impl<L, D> Widget for Pager<L, D>
+struct PagerWidget<'a, L, D>
+where
+    L: PagerLine,
+    D: LineDecorator<Line = L>,
+{
+    inner: &'a Pager<L, D>,
+}
+
+impl<'a, L, D> Widget for PagerWidget<'a, L, D>
 where
     L: PagerLine,
     D: LineDecorator<Line = L>,
@@ -224,17 +236,18 @@ where
         }
     }
     fn draw(&self, window: Window, _: RenderingHints) {
-        if let Some(ref content) = self.content {
+        if let Some(ref content) = self.inner.content {
             let height: Height = window.get_height();
             // The highlighter might need a minimum number of lines to figure out the syntax:
             // TODO: make this configurable?
             let min_highlight_context = 40;
             let num_adjacent_lines_to_load = max(height.into(), min_highlight_context / 2);
             let min_line = self
+                .inner
                 .current_line
                 .checked_sub(num_adjacent_lines_to_load)
                 .unwrap_or_else(|| LineIndex::new(0));
-            let max_line = self.current_line + num_adjacent_lines_to_load;
+            let max_line = self.inner.current_line + num_adjacent_lines_to_load;
 
             // Split window
             let decorator_demand = content
@@ -244,6 +257,7 @@ where
                 window.get_width(),
                 Width::new(0).unwrap(),
                 &[decorator_demand, Demand::at_least(1)],
+                &[0.0, 1.0],
             )[0];
 
             let (mut decoration_window, mut content_window) = window
@@ -261,13 +275,13 @@ where
 
             let num_line_wraps_until_current_line = {
                 content
-                    .view(min_line..self.current_line)
+                    .view(min_line..self.inner.current_line)
                     .map(|(_, line)| (cursor.num_expected_wraps(line.get_content()) + 1) as i32)
                     .sum::<i32>()
             };
             let num_line_wraps_from_current_line = {
                 content
-                    .view(self.current_line..max_line)
+                    .view(self.inner.current_line..max_line)
                     .map(|(_, line)| (cursor.num_expected_wraps(line.get_content()) + 1) as i32)
                     .sum::<i32>()
             };
@@ -286,7 +300,7 @@ where
 
             for (line_index, line) in content.view(min_line..max_line) {
                 let line_content = line.get_content();
-                let base_style = if line_index == self.current_line {
+                let base_style = if line_index == self.inner.current_line {
                     StyleModifier::new()
                         .invert(BoolModifyMode::Toggle)
                         .bold(true)
@@ -313,7 +327,7 @@ where
                 content.decorator.decorate(
                     &line,
                     line_index,
-                    self.current_line,
+                    self.inner.current_line,
                     decoration_window.create_subwindow(.., range_start_y..range_end_y),
                 );
                 //decoration_window.create_subwindow(.., range_start_y..range_end_y).fill('X');
@@ -423,7 +437,8 @@ where
 {
     /// Add a `Highlighter` to `PagerContent` that previously did not have one.
     pub fn with_highlighter<HN: Highlighter>(self, highlighter: &HN) -> PagerContent<L, D> {
-        let highlight_info = highlighter.highlight(self.storage.iter().map(|l| l as &PagerLine));
+        let highlight_info =
+            highlighter.highlight(self.storage.iter().map(|l| l as &dyn PagerLine));
         PagerContent {
             storage: self.storage,
             highlight_info,

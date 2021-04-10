@@ -17,7 +17,7 @@ use syntect::highlighting::Theme;
 /// use cases.
 pub trait Highlighter {
     /// Compute highlighting information for the given range of lines.
-    fn highlight<'a, L: Iterator<Item = &'a PagerLine>>(&self, lines: L) -> HighlightInfo;
+    fn highlight<'a, L: Iterator<Item = &'a dyn PagerLine>>(&self, lines: L) -> HighlightInfo;
 }
 
 /// Result of a highlighting operation (i.e., a call to Highlighter::highlight).
@@ -27,16 +27,16 @@ pub struct HighlightInfo {
     pub style_changes: Vec<Vec<(usize, StyleModifier)>>,
     /// Style that will be applied if no other style has been specified.
     pub default_style: StyleModifier,
-    no_change: Vec<(usize, StyleModifier)>,
 }
 
+const NO_CHANGE: Vec<(usize, StyleModifier)> = Vec::new();
+const NO_CHANGE_REF: &'static Vec<(usize, StyleModifier)> = &NO_CHANGE;
 impl HighlightInfo {
     /// Empty highlighting result that will not apply any style changes.
     pub fn none() -> Self {
         HighlightInfo {
             style_changes: Vec::new(),
             default_style: StyleModifier::new(),
-            no_change: Vec::new(),
         }
     }
 
@@ -44,7 +44,7 @@ impl HighlightInfo {
     pub fn get_info_for_line<L: Into<LineIndex>>(&self, l: L) -> &Vec<(usize, StyleModifier)> {
         self.style_changes
             .get(l.into().raw_value())
-            .unwrap_or(&self.no_change)
+            .unwrap_or(NO_CHANGE_REF)
     }
 
     /// Return the default style, i.e., the style that will be applied to text if no modifications
@@ -74,7 +74,7 @@ impl<'a> SyntectHighlighter<'a> {
 }
 
 impl<'a> Highlighter for SyntectHighlighter<'a> {
-    fn highlight<'b, L: Iterator<Item = &'b PagerLine>>(&self, lines: L) -> HighlightInfo {
+    fn highlight<'b, L: Iterator<Item = &'b dyn PagerLine>>(&self, lines: L) -> HighlightInfo {
         let mut info = HighlightInfo::none();
 
         let highlighter = highlighting::Highlighter::new(self.theme);
