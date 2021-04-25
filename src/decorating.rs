@@ -100,7 +100,7 @@ impl<L: PagerLine> LineDecorator for LineNumberDecorator<L> {
             .last()
             .map(|(i, _)| text_width(format!(" {} ", i).as_str()))
             .unwrap_or_else(|| Width::new(0).unwrap());
-        Demand::from_to(0, max_space.into())
+        Demand::exact(max_space)
     }
     fn decorate(&self, _: &L, line_to_decorate_index: LineIndex, _: LineIndex, mut window: Window) {
         let width = (window.get_width() - 2).positive_or_zero();
