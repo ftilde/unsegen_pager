@@ -52,7 +52,7 @@
 //!
 //!         {
 //!             let win = term.create_root_window();
-//!             pager.draw(win, RenderingHints::default());
+//!             pager.as_widget().draw(win, RenderingHints::default());
 //!         }
 //!         term.present();
 //!     }
